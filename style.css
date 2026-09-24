@@ -1,0 +1,49 @@
+body {
+    -webkit-user-select: none;
+    user-select: none;
+    background-color: #0f172a;
+    color: #f8fafc;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+@keyframes floatWatermark {
+    0% { top: 12%; left: 10%; transform: rotate(-10deg); }
+    50% { top: 70%; left: 55%; transform: rotate(-10deg); }
+    100% { top: 12%; left: 10%; transform: rotate(-10deg); }
+}
+
+.animated-watermark {
+    position: absolute;
+    pointer-events: none;
+    z-index: 50;
+    opacity: 0.25;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #ff6b6b;
+    background: transparent;
+    animation: floatWatermark 16s infinite ease-in-out;
+    white-space: nowrap;
+}
+
+/* Print Screen වළක්වමින් ආරක්ෂාව තහවුරු කිරීම සඳහා */
+@media print {
+    body {
+        display: none !important;
+    }
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
