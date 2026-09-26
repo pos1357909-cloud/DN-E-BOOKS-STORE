@@ -269,15 +269,31 @@
   .btn-success:hover { background: #059669; }
   .btn-sm { padding: 5px 12px; font-size: 0.8rem; border-radius: 6px; }
 
-  /* Mobile bottom tabs */
+  /* Mobile bottom tabs - Premium Look & Scrollable */
   .mobile-bottom-tabs {
     position: fixed; bottom: 0; left: 0; right: 0;
-    background: #1e293b; border-top: 1px solid #334155;
-    display: flex; z-index: 100; padding-bottom: env(safe-area-inset-bottom);
+    background: rgba(15, 23, 42, 0.95);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid rgba(51, 65, 85, 0.8);
+    display: flex; z-index: 100; 
+    padding-bottom: env(safe-area-inset-bottom);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.4);
   }
-  .mobile-tab { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 8px 4px; cursor: pointer; color: #64748b; transition: color 0.2s; font-size: 0.65rem; gap: 3px; }
-  .mobile-tab i { font-size: 1.1rem; }
+  .mobile-bottom-tabs::-webkit-scrollbar { display: none; }
+  .mobile-tab { 
+    flex: 1; 
+    min-width: 68px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 10px 4px; cursor: pointer; color: #64748b; 
+    transition: all 0.3s ease; font-size: 0.65rem; gap: 5px; font-weight: 600;
+  }
+  .mobile-tab i { font-size: 1.25rem; transition: transform 0.2s; }
+  .mobile-tab:hover { color: #94a3b8; }
   .mobile-tab.active { color: #eab308; }
+  .mobile-tab.active i { transform: translateY(-2px); }
 
   /* Locked overlay */
   .locked-overlay {
@@ -334,8 +350,29 @@
   }
   @media (max-width: 767px) {
     .sidebar { display: none; }
-    .content-area { padding-bottom: 70px; }
-    .admin-tabs-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .content-area { padding-bottom: 85px; } /* Space for larger bottom tabs */
+    
+    .admin-tabs-scroll { 
+      overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; 
+      padding-bottom: 5px; border-bottom: 1px solid #334155; margin-bottom: 10px;
+    }
+    .admin-tabs-scroll::-webkit-scrollbar { display: none; }
+    
+    /* Better modal layout on phones */
+    .modal-box { 
+      padding: 20px 15px !important; 
+      border-radius: 16px; 
+      width: calc(100% - 20px) !important;
+      margin: 10px !important;
+    }
+    
+    /* Ensure tables stretch edge-to-edge inside cards to maximize space */
+    .card .overflow-x-auto { 
+      margin-left: -1.25rem; 
+      margin-right: -1.25rem; 
+      padding-left: 1.25rem; 
+      padding-right: 1.25rem; 
+    }
   }
 
   /* Hero gradient text */
@@ -472,7 +509,7 @@
       <p class="text-slate-400 text-xs mt-1">ශ්‍රී ලංකා විභාග සූදානම් වේදිකාව</p>
     </div>
 
-    <div class="auth-card rounded-2xl p-6">
+    <div class="auth-card rounded-2xl p-5 sm:p-6">
       <!-- Auth Tabs -->
       <div class="flex gap-2 mb-6 bg-slate-900 rounded-xl p-1">
         <button class="tab-btn active flex-1 text-center" id="loginTabBtn" onclick="switchAuthTab('login')">
