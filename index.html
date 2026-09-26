@@ -373,6 +373,24 @@
       padding-left: 1.25rem; 
       padding-right: 1.25rem; 
     }
+    
+    /* Fine-tuned typography for mobile phones (better readability and sizing) */
+    h1 { font-size: 1.6rem !important; }
+    h2 { font-size: 1.35rem !important; }
+    .text-3xl { font-size: 1.5rem !important; }
+    .text-2xl { font-size: 1.3rem !important; }
+    .text-sm { font-size: 0.85rem !important; }
+    
+    /* Enhance Book Cards on mobile to look better and take less vertical space */
+    .book-card { padding: 14px !important; }
+    .book-card h4 { font-size: 0.95rem !important; line-height: 1.3; }
+    .book-card p { font-size: 0.75rem !important; }
+    .badge-type { font-size: 0.65rem !important; padding: 2px 8px !important; }
+    
+    /* Stat cards on mobile */
+    .stat-card { padding: 14px !important; }
+    .stat-card .text-2xl { font-size: 1.4rem !important; }
+    .stat-icon { width: 44px; height: 44px; font-size: 1.2rem; }
   }
 
   /* Hero gradient text */
@@ -391,7 +409,7 @@
   }
 
   /* Subject filter pills */
-  .subject-pill { padding: 5px 14px; border-radius: 20px; border: 1px solid #334155; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: #94a3b8; transition: all 0.2s; white-space: nowrap; }
+  .subject-pill { padding: 5px 14px; border-radius: 20px; border: 1px solid #334155; cursor: pointer; font-size: 0.8rem; font-weight: 600; color: #94a3b8; transition: all 0.2s; white-space: nowrap; flex-shrink: 0; }
   .subject-pill.active { background: #eab308; color: #0f172a; border-color: #eab308; }
   .subject-pill:hover:not(.active) { border-color: #64748b; color: #e2e8f0; }
 
@@ -1977,14 +1995,33 @@ let students = [];
 let orders = [];      // pending subscription requests
 let salesHistory = [];
 
-function loadData() {
+const API_URL = "http://localhost:5000/api"; // Backend connection URL
+
+async function loadData() {
+  try {
+    const response = await fetch(`${API_URL}/data`);
+    if (response.ok) {
+      const data = await response.json();
+      books = data.books || [];
+      students = data.students || [];
+      orders = data.orders || [];
+      salesHistory = data.salesHistory || [];
+      console.log("Data loaded from backend.");
+      return;
+    }
+  } catch (err) {
+    console.warn("Backend not available, falling back to Local Storage.", err);
+  }
+
+  // Fallback to localStorage if backend is offline
   books = JSON.parse(localStorage.getItem('dn_books') || '[]');
   students = JSON.parse(localStorage.getItem('dn_students') || '[]');
   orders = JSON.parse(localStorage.getItem('dn_orders') || '[]');
   salesHistory = JSON.parse(localStorage.getItem('dn_sales_history') || '[]');
 }
 
-function saveData() {
+async function saveData() {
+  // Always save to localStorage for offline persistence
   try {
     localStorage.setItem('dn_books', JSON.stringify(books));
     localStorage.setItem('dn_students', JSON.stringify(students));
@@ -1992,11 +2029,25 @@ function saveData() {
     localStorage.setItem('dn_sales_history', JSON.stringify(salesHistory));
   } catch (e) {
     if (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014) {
-      showToast('⚠️ Storage limit exceeded! Cannot save data. Please reduce PDF sizes or delete unused resources.', 'error');
+      showToast('⚠️ Storage limit exceeded! Cannot save data locally. Please reduce PDF sizes.', 'error');
     } else {
-      showToast('❌ Failed to save data: ' + (e.message || 'Unknown error'), 'error');
+      showToast('❌ Failed to save data locally: ' + (e.message || 'Unknown error'), 'error');
       console.error('saveData error:', e);
     }
+  }
+
+  // Sync to backend MongoDB
+  try {
+    const response = await fetch(`${API_URL}/sync`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ books, students, orders, salesHistory })
+    });
+    if (!response.ok) {
+      console.error("Backend sync failed.");
+    }
+  } catch (err) {
+    console.error("Error syncing with backend:", err);
   }
 }
 
@@ -2340,7 +2391,7 @@ function quickFillLogin(role) {
   doLogin();
 }
 
-function doLogin() {
+async function doLogin() {
   const email = document.getElementById('loginEmail').value.trim();
   const pass = document.getElementById('loginPass').value;
   const errEl = document.getElementById('loginError');
@@ -2348,17 +2399,54 @@ function doLogin() {
 
   if (!email || !pass) { showLoginError('Please fill in all fields / සියළු ක්ෂේත්‍ර පුරවන්න'); return; }
 
-  // Admin check
+  try {
+    // --- Try Backend API first ---
+    const resp = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, pass })
+    });
+    const data = await resp.json();
+
+    if (resp.ok && data.success) {
+      // Store JWT token
+      localStorage.setItem('dn_token', data.token);
+
+      if (data.isAdmin) {
+        currentUser = { type: 'admin' };
+        showPage('admin');
+        return;
+      } else {
+        // Update local student data from backend response
+        if (data.student) {
+          const idx = students.findIndex(s => s.id === data.student.id);
+          if (idx >= 0) students[idx] = { ...students[idx], ...data.student };
+          else students.push(data.student);
+        }
+        currentUser = { type: 'student', id: data.student.id };
+        showPage('student');
+        return;
+      }
+    } else {
+      showLoginError(data.error || 'Invalid email or password / වැරදි ඊමේල් හෝ මුරපදය');
+      return;
+    }
+  } catch (err) {
+    console.warn('Backend unavailable, falling back to local login:', err.message);
+  }
+
+  // --- Offline fallback: local student array check ---
   if (email === ADMIN_EMAIL && pass === ADMIN_PASS) {
     currentUser = { type: 'admin' };
     showPage('admin');
     return;
   }
 
-  // Student check
   const student = students.find(s => s.email.toLowerCase() === email.toLowerCase() && s.pass === pass);
   if (!student) { showLoginError('Invalid email or password / වැරදි ඊමේල් හෝ මුරපදය'); return; }
-  if (student.status === 'inactive') { showLoginError('Account inactive. Contact admin / ගිණුම අක්‍රියයි'); return; }
+  if (student.status === 'inactive' || student.status === 'Suspended') {
+    showLoginError('Account inactive. Contact admin / ගිණුම අක්‍රියයි'); return;
+  }
 
   currentUser = { type: 'student', id: student.id };
   showPage('student');
@@ -2370,7 +2458,7 @@ function showLoginError(msg) {
   el.classList.remove('hidden');
 }
 
-function doRegister() {
+async function doRegister() {
   const name = document.getElementById('regName').value.trim();
   const email = document.getElementById('regEmail').value.trim();
   const phone = document.getElementById('regPhone').value.trim();
@@ -2384,23 +2472,51 @@ function doRegister() {
   }
   if (pass.length < 6) { showRegisterError('Password must be at least 6 characters'); return; }
   if (!['6','7','8','9','10','11'].includes(grade)) { showRegisterError('Please select a valid grade (6-11)'); return; }
-  if (students.find(s => s.email.toLowerCase() === email.toLowerCase())) {
-    showRegisterError('Email already registered / ඊමේල් දැනටමත් ලියාපදිංචි වී ඇත'); return;
-  }
 
-  // Split name
   const nameParts = name.split(' ');
   const firstName = nameParts[0];
   const lastName = nameParts.slice(1).join(' ') || '';
+
+  try {
+    // --- Try Backend API registration first ---
+    const resp = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ firstName, lastName, email, pass, phone: phone || '', grade: parseInt(grade) })
+    });
+    const data = await resp.json();
+
+    if (resp.ok && data.success) {
+      localStorage.setItem('dn_token', data.token);
+      if (data.student) {
+        students.push(data.student);
+      }
+      currentUser = { type: 'student', id: data.student.id };
+      showPage('student');
+      showToast('Account created successfully! Welcome! / ගිණුම සාර්ථකව සාදන ලදි!', 'success');
+      return;
+    } else {
+      showRegisterError(data.error || 'Registration failed. Please try again.');
+      return;
+    }
+  } catch (err) {
+    console.warn('Backend unavailable, registering locally:', err.message);
+  }
+
+  // --- Offline fallback: local registration ---
+  if (students.find(s => s.email.toLowerCase() === email.toLowerCase())) {
+    showRegisterError('Email already registered / ඊමේල් දැනටමත් ලියාපදිංචි වී ඇත'); return;
+  }
 
   const newStudent = {
     id: generateId(),
     firstName, lastName,
     grade: parseInt(grade),
     email, phone: phone || '',
-    pass, status: 'active',
+    pass, status: 'Active',
     allowedBooks: [],
-    subscription: { plan: 'FREE', expiryDate: null, activatedAt: null }
+    subscription: { plan: 'FREE', expiryDate: null, activatedAt: null },
+    quizHistory: []
   };
 
   students.push(newStudent);
@@ -2419,6 +2535,8 @@ function showRegisterError(msg) {
 
 function doLogout() {
   currentUser = null;
+  // Clear JWT token
+  localStorage.removeItem('dn_token');
   // Clear PDF state
   closePdfReader();
   showPage('auth');
@@ -5656,8 +5774,8 @@ function renderStudentScoreHistory() {
 
 // INITIALIZATION
 // ============================================================
-(function init() {
-  loadData();
+(async function init() {
+  await loadData();
   runMigration();
   initAuthCanvas();
   showPage('auth');
